@@ -82,7 +82,7 @@ def color_growth(val):
     return f'color: {color}; font-weight: 800; font-size: 1.3rem;'
 
 # --- Sidebar ---
-st.sidebar.markdown("<h1 style='text-align:center;'>🏥 HUB</h1>", unsafe_allow_html=True)
+st.sidebar.markdown("<h1 style='text-align:center;'>🏥 SU</h1>", unsafe_allow_html=True)
 file_1 = st.sidebar.file_uploader("📂 เดือนที่ 1 (Previous Month)", type=["xlsx"], key="f1")
 file_2 = st.sidebar.file_uploader("📂 เดือนที่ 2 (Current Month)", type=["xlsx"], key="f2")
 
@@ -195,4 +195,4 @@ if file_1 and file_2:
                     st.error(f"Error: กรุณาตรวจสอบไฟล์ requirements.txt ว่ามี 'xlsxwriter' หรือไม่? ({e})")
 
 else:
-    st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 EXECUTIVE HUB</h1><p>กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มวิเคราะห์</p></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 EXECUTIVE Calculation SYSTEM</h1><p>กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มวิเคราะห์</p></div>", unsafe_allow_html=True)
