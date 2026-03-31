@@ -1,104 +1,133 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import io
+from datetime import datetime
 
-# --- 1. SETTINGS ---
-st.set_page_config(page_title="Medical Device Days Dashboard", layout="wide")
+# 1. Config & Premium Luxury Styling
+st.set_page_config(page_title="Executive Device Analytics", page_icon="🏥", layout="wide")
 
-def get_accurate_sum(df):
-    """ฟังก์ชันดึงค่าตัวเลขที่ถูกต้องรายบรรทัด (ป้องกันการบวกเลข Total ซ้ำ)"""
-    # ลบบรรทัดว่าง
-    df = df.dropna(how='all').reset_index(drop=True)
+st.markdown("""
+    <style>
+    .stApp { background-color: #f4f7f9; }
+    .main-title { 
+        color: #1a3a5f; font-family: 'Sarabun', sans-serif; 
+        font-weight: 800; text-align: center; margin-bottom: 30px;
+        letter-spacing: 1px;
+    }
+    .kpi-box {
+        background: white; padding: 25px; border-radius: 20px; text-align: center;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        border-top: 5px solid #1a3a5f;
+        transition: 0.3s;
+    }
+    .kpi-box:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+    .stButton>button {
+        border-radius: 15px; background: linear-gradient(135deg, #1a3a5f 0%, #2c5282 100%);
+        color: white; border: none; height: 3.5em; font-weight: bold; width: 100%;
+        box-shadow: 0 4px 15px rgba(26, 58, 95, 0.2);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- Keywords Configuration ---
+keywords = ["Ventilator", "Foley", "Central line", "Port A Cath"]
+
+def get_safe_total(df_in):
+    """ฟังก์ชันช่วยหายอดรวมอุปกรณ์จาก Keyword"""
+    d_cols = [c for c in df_in.columns if any(k.lower() in str(c).lower() for k in keywords)]
+    if not d_cols: return 0, []
+    df_c = df_in.copy()
+    for c in d_cols: 
+        df_c[c] = pd.to_numeric(df_c[c], errors='coerce').fillna(0)
+    return df_c[d_cols].values.sum(), d_cols
+
+def process_file_summary(uploaded_file):
+    """ฟังก์ชันอ่านไฟล์และสรุปยอดราย Sheet"""
+    excel_file = pd.ExcelFile(uploaded_file)
+    data = []
+    for s in excel_file.sheet_names:
+        df = pd.read_excel(uploaded_file, sheet_name=s).dropna(how='all')
+        total_sum, _ = get_safe_total(df)
+        data.append({'Ward': s, 'Total_Days': total_sum})
+    return pd.DataFrame(data)
+
+# --- Sidebar ---
+st.sidebar.markdown("<h2 style='text-align:center; color:#1a3a5f;'>🏥 Device Comparison</h2>", unsafe_allow_html=True)
+file_1 = st.sidebar.file_uploader("📂 ไฟล์ที่ 1 (เดือนก่อนหน้า)", type=["xlsx"], key="f1")
+file_2 = st.sidebar.file_uploader("📂 ไฟล์ที่ 2 (เดือนปัจจุบัน)", type=["xlsx"], key="f2")
+
+if file_1 and file_2:
+    st.sidebar.markdown("---")
+    page = st.sidebar.radio("Navigation:", ["📊 Comparison Analytics", "📄 Data Editor (File 2)"])
+
+    # --- คำนวณข้อมูลเปรียบเทียบ ---
+    df_stats_1 = process_file_summary(file_1)
+    df_stats_2 = process_file_summary(file_2)
     
-    # โดยปกติ: Column 0 คือชื่ออุปกรณ์, Column 1 คือตัวเลข
-    # เราจะกรองเอาเฉพาะบรรทัดที่มีชื่ออุปกรณ์และมีตัวเลขจริงๆ
-    # และตัดบรรทัดที่มีคำว่า 'Total', 'รวม', 'Sum' ออกเพื่อไม่ให้เลขเบิ้ล
-    
-    temp_df = df.copy()
-    col_name = temp_df.columns[0]
-    col_val = temp_df.columns[1]
-    
-    # แปลงคอลัมน์ตัวเลขให้เป็น numeric (ค่าไหนไม่ใช่เลขจะเป็น NaN)
-    temp_df[col_val] = pd.to_numeric(temp_df[col_val], errors='coerce')
-    
-    # กรองเอาเฉพาะบรรทัดที่:
-    # 1. คอลัมน์แรกไม่ใช่คำว่า Total/รวม
-    # 2. คอลัมน์สองเป็นตัวเลขและมากกว่า 0
-    mask = (
-        temp_df[col_name].astype(str).str.contains('Total|รวม|Sum|Grand', case=False, na=False) == False
-    ) & (temp_df[col_val] > 0)
-    
-    final_df = temp_df[mask]
-    return final_df[col_val].sum(), final_df
+    # Merge ข้อมูลเข้าด้วยกัน
+    df_compare = pd.merge(df_stats_1, df_stats_2, on='Ward', how='outer', suffixes=('_File1', '_File2')).fillna(0)
+    df_compare['Diff'] = df_compare['Total_Days_File2'] - df_compare['Total_Days_File1']
+    df_compare['% Growth'] = ((df_compare['Diff'] / df_compare['Total_Days_File1']) * 100).fillna(0)
 
-def main():
-    st.title("🏥 Executive Device Days Dashboard (Corrected)")
-    st.divider()
+    # --- หน้าเปรียบเทียบ ---
+    if page == "📊 Comparison Analytics":
+        st.markdown("<h1 class='main-title'>📊 Executive Comparison Dashboard</h1>", unsafe_allow_html=True)
 
-    with st.sidebar:
-        st.header("📂 Data Import")
-        f1 = st.file_uploader("เดือนที่ 1 (Base)", type=['xlsx'], key="u1")
-        f2 = st.file_uploader("เดือนที่ 2 (Compare)", type=['xlsx'], key="u2")
+        # KPI Metrics
+        total_1 = df_compare['Total_Days_File1'].sum()
+        total_2 = df_compare['Total_Days_File2'].sum()
+        total_diff = total_2 - total_1
+        total_growth = (total_diff / total_1 * 100) if total_1 != 0 else 0
 
-    if f1 and f2:
-        try:
-            xls1 = pd.ExcelFile(f1)
-            xls2 = pd.ExcelFile(f2)
-            all_sheets = xls1.sheet_names
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(f"<div class='kpi-box'><p style='color:#6c757d; font-weight:bold;'>PREVIOUS TOTAL</p><h1 style='color:#1a3a5f;'>{int(total_1):,}</h1></div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"<div class='kpi-box'><p style='color:#6c757d; font-weight:bold;'>CURRENT TOTAL</p><h1 style='color:#1a3a5f;'>{int(total_2):,}</h1></div>", unsafe_allow_html=True)
+        with c3:
+            color = "#27ae60" if total_diff >= 0 else "#e74c3c"
+            st.markdown(f"<div class='kpi-box' style='border-top-color:{color};'><p style='color:#6c757d; font-weight:bold;'>VARIANCE</p><h1 style='color:{color};'>{int(total_diff):+,}</h1><p style='color:{color}; font-weight:bold;'>({total_growth:+.1f}%)</p></div>", unsafe_allow_html=True)
 
-            summary_data = []
-            g_total1, g_total2 = 0, 0
+        st.markdown("---")
+        
+        # กราฟเปรียบเทียบ
+        st.subheader("📈 Ward Comparison: File 1 vs File 2")
+        fig_compare = px.bar(
+            df_compare, x='Ward', y=['Total_Days_File1', 'Total_Days_File2'],
+            barmode='group',
+            labels={'value': 'Total Days', 'variable': 'File Source'},
+            title="เปรียบเทียบภาระงานรายวอร์ด",
+            color_discrete_sequence=['#adb5bd', '#1a3a5f'] # เทา vs น้ำเงินเข้ม
+        )
+        st.plotly_chart(fig_compare, use_container_width=True)
 
-            for sheet in all_sheets:
-                d1_raw = pd.read_excel(f1, sheet_name=sheet)
-                d2_raw = pd.read_excel(f2, sheet_name=sheet)
+        # ตารางสรุปผลต่าง
+        st.subheader("📋 Comparison Summary Table")
+        st.dataframe(df_compare.style.format({'% Growth': '{:.2f}%', 'Total_Days_File1': '{:,.0f}', 'Total_Days_File2': '{:,.0f}', 'Diff': '{:+,.0f}'}), use_container_width=True)
 
-                # คำนวณยอดแบบแม่นยำรายบรรทัด
-                val1, _ = get_accurate_sum(d1_raw)
-                val2, _ = get_accurate_sum(d2_raw)
+        # ปุ่ม Export Comparison
+        buf_comp = io.BytesIO()
+        df_compare.to_excel(buf_comp, index=False)
+        st.download_button("📥 ดาวน์โหลดรายงานเปรียบเทียบ (Excel)", data=buf_comp.getvalue(), file_name="Device_Comparison_Report.xlsx")
 
-                g_total1 += val1
-                g_total2 += val2
-                
-                summary_data.append({"แผนก": sheet, "M1": val1, "M2": val2})
+    # --- หน้า Data Editor (แสดงข้อมูลไฟล์ล่าสุด) ---
+    elif page == "📄 Data Editor (File 2)":
+        excel_2 = pd.ExcelFile(file_2)
+        selected_sheet = st.sidebar.selectbox("เลือกแผนก (Ward):", excel_2.sheet_names)
+        st.markdown(f"<h1 class='main-title'>📄 แผนก: {selected_sheet} (Current File)</h1>", unsafe_allow_html=True)
+        
+        df = pd.read_excel(file_2, sheet_name=selected_sheet).dropna(how='all')
+        edited_df = st.data_editor(df, use_container_width=True, hide_index=True)
+        
+        total_val, device_cols = get_safe_total(edited_df)
+        st.subheader("📊 สรุปยอดอุปกรณ์รายแผนก")
+        if device_cols:
+            cols_grid = st.columns(len(device_cols))
+            sum_vals = edited_df[device_cols].apply(pd.to_numeric, errors='coerce').fillna(0).sum()
+            for i, col_name in enumerate(device_cols):
+                with cols_grid[i % len(device_cols)]:
+                    st.metric(label=col_name, value=f"{int(sum_vals[col_name]):,}")
 
-            df_summary = pd.DataFrame(summary_data)
-
-            # --- KPI Cards ---
-            st.subheader("💰 สรุปยอดรวม (ตรวจสอบความถูกต้อง)")
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("ยอดรวม M1", f"{g_total1:,.0f}")
-            m2.metric("ยอดรวม M2", f"{g_total2:,.0f}")
-            m3.metric("ผลต่าง", f"{g_total2 - g_total1:+,.0f}")
-            m4.metric("Growth (%)", f"{((g_total2-g_total1)/g_total1*100 if g_total1 != 0 else 0):+.2f}%")
-
-            # --- กราฟเปรียบเทียบรายแผนก ---
-            st.divider()
-            fig = px.bar(df_summary, x='แผนก', y=['M1', 'M2'], barmode='group',
-                         title="เปรียบเทียบ Device Days รายแผนก (ยอดสุทธิ)",
-                         color_discrete_sequence=['#94a3b8', '#2563eb'], template="plotly_white")
-            st.plotly_chart(fig, use_container_width=True)
-
-            # --- ตารางตรวจสอบความถูกต้องรายแผนก ---
-            st.divider()
-            st.subheader("🔍 ตารางตรวจสอบรายรายการ (ป้องกันเลขเบิ้ล)")
-            selected_dept = st.selectbox("เลือกแผนกเพื่อดูรายการที่นำมาคำนวณ:", all_sheets)
-            
-            _, d1_detailed = get_accurate_sum(pd.read_excel(f1, sheet_name=selected_dept))
-            _, d2_detailed = get_accurate_sum(pd.read_excel(f2, sheet_name=selected_dept))
-
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.write(f"รายการที่ระบบดึงจาก M1 ({selected_dept})")
-                st.dataframe(d1_detailed.iloc[:, :2], use_container_width=True)
-            with col_b:
-                st.write(f"รายการที่ระบบดึงจาก M2 ({selected_dept})")
-                st.dataframe(d2_detailed.iloc[:, :2], use_container_width=True)
-
-        except Exception as e:
-            st.error(f"❌ เกิดข้อผิดพลาด: {e}")
-    else:
-        st.info("💡 กรุณาอัปโหลดไฟล์ Excel ทั้ง 2 เดือน")
-
-if __name__ == "__main__":
-    main()
+else:
+    st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 Device Comparative Analysis</h1><p>Luxury Web-based Data Management System</p><p style='color:#6c757d;'>กรุณาอัปโหลดไฟล์ Excel 2 ชุดเพื่อเปรียบเทียบข้อมูล</p></div>", unsafe_allow_html=True)
