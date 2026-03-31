@@ -82,7 +82,7 @@ def color_growth(val):
     return f'color: {color}; font-weight: 800; font-size: 1.3rem;'
 
 # --- Sidebar ---
-st.sidebar.markdown("<h1 style='text-align:center;'>🏥 HUB</h1>", unsafe_allow_html=True)
+st.sidebar.markdown("<h1 style='text-align:center;'>🏥 SYSTEM</h1>", unsafe_allow_html=True)
 file_1 = st.sidebar.file_uploader("📂 เดือนที่ 1 (Previous Month)", type=["xlsx"], key="f1")
 file_2 = st.sidebar.file_uploader("📂 เดือนที่ 2 (Current Month)", type=["xlsx"], key="f2")
 
