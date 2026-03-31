@@ -5,7 +5,6 @@ import plotly.express as px
 # 1. Page Configuration
 st.set_page_config(page_title="Medical Analytics Pro", layout="wide")
 
-# Custom Styling
 st.markdown("""
     <style>
     .main { background-color: #f4f7f6; }
@@ -13,70 +12,65 @@ st.markdown("""
         background: white; padding: 20px; border-radius: 12px; 
         box-shadow: 0 4px 6px rgba(0,0,0,0.03); border: 1px solid #e1e4e8;
     }
-    h1, h2 { color: #1a365d; font-weight: 700; }
     </style>
     """, unsafe_allow_html=True)
 
-def get_sheet_summary(file):
-    xls = pd.ExcelFile(file)
-    summary_list = []
-    grand_total = 0
-    
-    for sheet in xls.sheet_names:
-        df = pd.read_excel(file, sheet_name=sheet)
-        
-        # --- จุดแก้ไขสำคัญ: ป้องกันชื่อคอลัมน์ซ้ำ ---
-        # ถ้ามีคอลัมน์ชื่อ 'Department' หรือชื่อที่ระบบจะใช้ ให้ลบออกก่อน
-        df = df.drop(columns=['Dept_Name', 'Total_Val'], errors='ignore')
-        
-        # จัดการข้อมูลตัวเลข ป้องกัน Error str+int
-        for col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        df = df.fillna(0)
-        
-        # เลือกคอลัมน์ตัวเลขแรกที่พบเพื่อหายอดรวม
-        num_cols = df.select_dtypes(include=['number']).columns
-        if not num_cols.empty:
-            val_col = num_cols[0]
-            s_total = df[val_col].sum()
-            grand_total += s_total
-            # เก็บข้อมูลโดยใช้ชื่อที่ระบบกำหนดเอง ไม่ปนกับในไฟล์
-            summary_list.append({'Dept_Name': str(sheet), 'Total_Val': s_total, 'Raw_Data': df})
-            
-    return grand_total, summary_list
-
 def main():
     st.title("🏥 Executive Medical Dashboard")
-    st.caption("ระบบวิเคราะห์ข้อมูลเปรียบเทียบผลการดำเนินงานรายแผนก")
     st.divider()
 
     with st.sidebar:
         st.header("📂 Data Import")
-        f1 = st.file_uploader("เดือนที่ 1 (Base)", type=['xlsx'])
-        f2 = st.file_uploader("เดือนที่ 2 (Compare)", type=['xlsx'])
-        if f1 and f2:
-            st.success("✅ เชื่อมต่อข้อมูลสำเร็จ")
+        f1 = st.file_uploader("เดือนที่ 1 (Base)", type=['xlsx'], key="file1")
+        f2 = st.file_uploader("เดือนที่ 2 (Compare)", type=['xlsx'], key="file2")
 
     if f1 and f2:
         try:
-            # ดึงข้อมูลและสรุปยอด
-            total1, list1 = get_sheet_summary(f1)
-            total2, list2 = get_sheet_summary(f2)
-            
-            # สร้าง DataFrame เปรียบเทียบภาพรวมแผนก
-            df_comp1 = pd.DataFrame([{'Dept_Name': x['Dept_Name'], 'M1': x['Total_Val']} for x in list1])
-            df_comp2 = pd.DataFrame([{'Dept_Name': x['Dept_Name'], 'M2': x['Total_Val']} for x in list2])
-            df_comp = pd.merge(df_comp1, df_comp2, on='Dept_Name', how='outer').fillna(0)
-            
-            diff_all = total2 - total1
-            pct_all = (diff_all / total1 * 100) if total1 != 0 else 0
+            # อ่านชื่อ Sheet ทั้งหมด
+            xls1 = pd.ExcelFile(f1)
+            xls2 = pd.ExcelFile(f2)
+            all_sheets = xls1.sheet_names
 
-            # --- ส่วนที่ 1: KPI Cards ---
-            st.markdown("### 💰 สรุปภาพรวมทุกแผนก")
+            # --- ส่วนที่ 1: คำนวณสรุปยอดรายแผนก (เลี่ยงการใช้ Merge ชื่อคอลัมน์) ---
+            summary_data = []
+            grand_total1 = 0
+            grand_total2 = 0
+
+            for sheet in all_sheets:
+                # อ่านข้อมูล
+                d1 = pd.read_excel(f1, sheet_name=sheet)
+                d2 = pd.read_excel(f2, sheet_name=sheet)
+
+                # แปลงข้อมูลเป็นตัวเลขอัตโนมัติ ป้องกัน Error
+                for d in [d1, d2]:
+                    for col in d.columns:
+                        d[col] = pd.to_numeric(d[col], errors='coerce')
+                
+                # หาคอลัมน์ตัวเลขแรกที่เจอ
+                num_col1 = d1.select_dtypes(include=['number']).columns[0]
+                num_col2 = d2.select_dtypes(include=['number']).columns[0]
+
+                val1 = d1[num_col1].sum()
+                val2 = d2[num_col2].sum()
+
+                grand_total1 += val1
+                grand_total2 += val2
+                
+                summary_data.append({
+                    "แผนก": sheet,
+                    "เดือนที่ 1": val1,
+                    "เดือนที่ 2": val2
+                })
+
+            df_summary = pd.DataFrame(summary_data)
+            diff_all = grand_total2 - grand_total1
+            pct_all = (diff_all / grand_total1 * 100) if grand_total1 != 0 else 0
+
+            # --- แสดง KPI Cards ---
+            st.markdown("### 💰 สรุปภาพรวม")
             m1, m2, m3, m4 = st.columns(4)
-            m1.metric("ยอดรวม M1", f"{total1:,.2f}")
-            m2.metric("ยอดรวม M2", f"{total2:,.2f}")
+            m1.metric("ยอดรวม M1", f"{grand_total1:,.2f}")
+            m2.metric("ยอดรวม M2", f"{grand_total2:,.2f}")
             m3.metric("ผลต่าง", f"{diff_all:+,.2f}")
             m4.metric("Growth (%)", f"{pct_all:+.2f}%", delta=f"{pct_all:+.2f}%")
             
@@ -84,48 +78,51 @@ def main():
 
             # --- ส่วนที่ 2: กราฟแท่ง ---
             st.markdown("### 📊 เปรียบเทียบผลงานรายแผนก")
-            fig = px.bar(df_comp, x='Dept_Name', y=['M1', 'M2'],
-                         barmode='group', 
-                         labels={'value': 'Amount', 'variable': 'Period', 'Dept_Name': 'แผนก'},
-                         color_discrete_sequence=['#94a3b8', '#2563eb'],
+            fig = px.bar(df_summary, x='แผนก', y=['เดือนที่ 1', 'เดือนที่ 2'],
+                         barmode='group', color_discrete_sequence=['#94a3b8', '#2563eb'],
                          template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-            # --- ส่วนที่ 3: เจาะลึกรายแผนก (จุดที่เคย Error) ---
+            # --- ส่วนที่ 3: เจาะลึกรายแผนก (Fixed Error จุดนี้) ---
             st.divider()
             st.markdown("### 🔍 เจาะลึกรายละเอียดรายแผนก")
-            
-            selected_dept = st.selectbox("เลือกแผนกที่ต้องการตรวจสอบ:", df_comp['Dept_Name'].tolist())
-            
-            # ดึงข้อมูล Raw Data ของแผนกนั้นมาวิเคราะห์รายการย่อย
-            d1_data = next(item['Raw_Data'] for item in list1 if item['Dept_Name'] == selected_dept)
-            d2_data = next(item['Raw_Data'] for item in list2 if item['Dept_Name'] == selected_dept)
-            
-            cat_col = d1_data.columns[0] # คอลัมน์แรก (ชื่อรายการ)
-            val_col = d1_data.select_dtypes(include=['number']).columns[0] # คอลัมน์ตัวเลขแรก
-            
-            t1 = d1_data.groupby(cat_col)[val_col].sum().reset_index()
-            t2 = d2_data.groupby(cat_col)[val_col].sum().reset_index()
-            
-            # ใช้ merge แบบระบุชื่อคอลัมน์ชัดเจน ป้องกันการเอา 'Department' มาแทรกซ้ำ
-            item_table = pd.merge(t1, t2, on=cat_col, how='outer', suffixes=(' (M1)', ' (M2)')).fillna(0)
-            item_table['ผลต่าง'] = item_table.iloc[:, 2] - item_table.iloc[:, 1]
-            
-            st.write(f"แสดงข้อมูลรายการของแผนก: **{selected_dept}**")
+            selected_dept = st.selectbox("เลือกแผนกที่ต้องการตรวจสอบ:", all_sheets)
+
+            # อ่านข้อมูลแผนกที่เลือกแบบใหม่ ไม่มีการใช้ชื่อคอลัมน์เดิมจากไฟล์มาสร้างตัวแปร
+            deep1 = pd.read_excel(f1, sheet_name=selected_dept)
+            deep2 = pd.read_excel(f2, sheet_name=selected_dept)
+
+            cat_col = deep1.columns[0] # ชื่อรายการ (คอลัมน์แรก)
+            # หาคอลัมน์ตัวเลขแรก
+            val_col_name = deep1.select_dtypes(include=['number', 'object']).columns
+            # บังคับเป็นตัวเลข
+            deep1[deep1.columns[1]] = pd.to_numeric(deep1[deep1.columns[1]], errors='coerce').fillna(0)
+            deep2[deep2.columns[1]] = pd.to_numeric(deep2[deep2.columns[1]], errors='coerce').fillna(0)
+
+            # สรุปรายรายการ
+            t1 = deep1.groupby(deep1.columns[0])[deep1.columns[1]].sum()
+            t2 = deep2.groupby(deep2.columns[0])[deep2.columns[1]].sum()
+
+            # สร้าง DataFrame ใหม่จาก Index เพื่อเลี่ยงชื่อคอลัมน์เดิมชนกัน
+            final_df = pd.DataFrame({
+                "รายการ": t1.index,
+                "เดือนที่ 1": t1.values,
+                "เดือนที่ 2": t2.reindex(t1.index, fill_value=0).values
+            })
+            final_df["ผลต่าง"] = final_df["เดือนที่ 2"] - final_df["เดือนที่ 1"]
+
+            st.write(f"วิเคราะห์แผนก: **{selected_dept}**")
             st.dataframe(
-                item_table.style.format({
-                    item_table.columns[1]: '{:,.2f}',
-                    item_table.columns[2]: '{:,.2f}',
-                    'ผลต่าง': '{:+,.2f}'
-                }).background_gradient(subset=['ผลต่าง'], cmap='RdYlGn'),
+                final_df.style.format({"เดือนที่ 1": "{:,.2f}", "เดือนที่ 2": "{:,.2f}", "ผลต่าง": "{:+,.2f}"})
+                .background_gradient(subset=['ผลต่าง'], cmap='RdYlGn'),
                 use_container_width=True
             )
 
         except Exception as e:
             st.error(f"❌ ระบบขัดข้อง: {e}")
-            st.info("แนะนำ: ตรวจสอบว่าในไฟล์มีคอลัมน์ตัวเลขอย่างน้อย 1 คอลัมน์")
+            st.info("💡 ข้อแนะนำ: ตรวจสอบว่าคอลัมน์แรกคือชื่อรายการ และคอลัมน์ที่สองคือตัวเลข")
     else:
-        st.info("💡 อัปโหลดไฟล์ Excel เดือนที่ 1 และ 2 เพื่อเริ่มต้น")
+        st.info("💡 กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มต้น")
 
 if __name__ == "__main__":
     main()
