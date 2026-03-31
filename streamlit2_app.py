@@ -4,58 +4,92 @@ import plotly.express as px
 import io
 from datetime import datetime
 
-# 1. Config & Ultra-Modern Executive Styling
+# 1. Config & Ultra-Clear Executive Styling
 st.set_page_config(page_title="Executive Device Analytics", page_icon="🏥", layout="wide")
 
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap');
-    html, body, [class*="css"] { font-family: 'Sarabun', sans-serif; color: #000000; }
     
-    .stApp { background-color: #f8fafc; }
+    /* บังคับตัวหนังสือทั่วทั้งแอปให้ดำสนิทและชัดเจน */
+    html, body, [class*="css"] { 
+        font-family: 'Sarabun', sans-serif; 
+        color: #000000 !important; 
+    }
     
-    /* Header & Title */
+    .stApp { background-color: #ffffff; }
+    
+    /* หัวข้อหลักตัวใหญ่และหนาพิเศษ */
     .main-title { 
-        color: #0f172a; font-size: 3rem; font-weight: 800; 
-        text-align: center; margin-bottom: 50px; letter-spacing: -1px;
+        color: #0f172a; 
+        font-size: 3.8rem; 
+        font-weight: 800; 
+        text-align: center; 
+        margin-bottom: 50px;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
     }
 
     /* Mega KPI Card - ใหญ่ ชัดเจน ทันสมัย */
     .kpi-container {
-        background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(10px);
-        padding: 4rem 2rem;
-        border-radius: 32px;
+        background: #f8fafc;
+        padding: 3.5rem 2rem;
+        border-radius: 35px;
         text-align: center;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
-        border: 1px solid #ffffff;
-        transition: transform 0.3s ease;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        border: 2px solid #e2e8f0;
     }
-    .kpi-container:hover { transform: translateY(-10px); }
     
     .kpi-label { 
-        color: #64748b; font-size: 1.4rem; font-weight: 700; 
-        text-transform: uppercase; letter-spacing: 2px; margin-bottom: 1rem;
+        color: #475569; 
+        font-size: 1.4rem; 
+        font-weight: 700; 
+        text-transform: uppercase; 
+        letter-spacing: 2px;
+        margin-bottom: 10px;
     }
+    
     .kpi-value { 
-        color: #0f172a; font-size: 5.5rem; font-weight: 800; 
-        margin: 0; line-height: 1; letter-spacing: -2px;
+        color: #000000; 
+        font-size: 5.5rem; 
+        font-weight: 800; 
+        margin: 0; 
+        line-height: 1;
     }
+    
     .kpi-delta-tag { 
-        margin-top: 1.5rem; padding: 12px 28px; border-radius: 100px; 
-        display: inline-block; font-weight: 800; font-size: 1.8rem; 
+        margin-top: 1.5rem; 
+        padding: 10px 25px; 
+        border-radius: 100px; 
+        display: inline-block; 
+        font-weight: 800; 
+        font-size: 1.8rem; 
     }
 
-    /* Button Customization */
+    /* ปรับแต่งตาราง Data Editor ให้ดูง่าย */
+    .stDataEditor {
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 15px;
+    }
+    
+    /* ปุ่มกดตัวหนาชัดเจน */
     .stButton>button {
-        border-radius: 16px; background: #0f172a; color: white;
-        font-weight: 800; border: none; padding: 1rem 2rem; font-size: 1.2rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border-radius: 15px; 
+        background: #0f172a; 
+        color: white !important;
+        font-weight: 800; 
+        border: none; 
+        padding: 1.2rem 2rem; 
+        font-size: 1.3rem;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        background: #1e293b;
+        transform: translateY(-2px);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- Keywords & Logic ---
+# --- Keywords Configuration ---
 keywords = ["Ventilator", "Foley", "Central line", "Port A Cath"]
 
 def get_safe_total(df_in):
@@ -75,14 +109,18 @@ def process_file_summary(uploaded_file):
         data.append({'Ward': s, 'Total_Days': int(total_sum)})
     return pd.DataFrame(data)
 
+def color_growth(val):
+    color = '#059669' if val > 0 else '#dc2626' if val < 0 else '#64748b'
+    return f'color: {color}; font-weight: 800; font-size: 1.2rem;'
+
 # --- Sidebar ---
-st.sidebar.markdown("<h1 style='text-align:center;'>🏥 HUB</h1>", unsafe_allow_html=True)
-file_1 = st.sidebar.file_uploader("📂 เดือนที่ 1 (Previous)", type=["xlsx"], key="f1")
-file_2 = st.sidebar.file_uploader("📂 เดือนที่ 2 (Current)", type=["xlsx"], key="f2")
+st.sidebar.markdown("<h1 style='text-align:center; color:#0f172a;'>🏥 HUB SYSTEM</h1>", unsafe_allow_html=True)
+file_1 = st.sidebar.file_uploader("📂 เดือนที่ 1 (Previous Month)", type=["xlsx"], key="f1")
+file_2 = st.sidebar.file_uploader("📂 เดือนที่ 2 (Current Month)", type=["xlsx"], key="f2")
 
 if file_1 and file_2:
     st.sidebar.markdown("---")
-    page = st.sidebar.selectbox("เลือกหน้าจอ", ["📊 Executive Dashboard", "📄 Data Editor"])
+    page = st.sidebar.selectbox("🎯 เมนูเลือกดูข้อมูล", ["📊 Executive Dashboard", "📄 Data Editor"])
 
     df_stats_1 = process_file_summary(file_1)
     df_stats_2 = process_file_summary(file_2)
@@ -96,88 +134,95 @@ if file_1 and file_2:
 
         t1, t2 = int(df_compare['Total_Days_M1'].sum()), int(df_compare['Total_Days_M2'].sum())
         diff, growth = t2 - t1, int((t2-t1)/t1*100) if t1 != 0 else 0
-        bg_color = "#dcfce7" if diff >= 0 else "#fee2e2"
-        text_color = "#166534" if diff >= 0 else "#991b1b"
+        bg_color = "#d1fae5" if diff >= 0 else "#fee2e2"
+        text_color = "#047857" if diff >= 0 else "#b91c1c"
 
-        # --- MEGA KPI SECTION ---
+        # MEGA KPI SECTION
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.markdown(f"""<div class='kpi-container'>
-                <p class='kpi-label'>Previous Month</p>
-                <p class='kpi-value'>{t1:,}</p>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"<div class='kpi-container'><p class='kpi-label'>Previous Total</p><p class='kpi-value'>{t1:,}</p></div>", unsafe_allow_html=True)
         with c2:
-            st.markdown(f"""<div class='kpi-container'>
-                <p class='kpi-label'>Current Month</p>
-                <p class='kpi-value' style='color:#2563eb;'>{t2:,}</p>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"<div class='kpi-container'><p class='kpi-label'>Current Total</p><p class='kpi-value' style='color:#2563eb;'>{t2:,}</p></div>", unsafe_allow_html=True)
         with c3:
-            st.markdown(f"""<div class='kpi-container'>
-                <p class='kpi-label'>Variance</p>
-                <p class='kpi-value' style='color:{text_color};'>{diff:+,}</p>
-                <div class='kpi-delta-tag' style='background:{bg_color}; color:{text_color};'>{growth:+,}%</div>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div class='kpi-container'>
+                    <p class='kpi-label'>Variance</p>
+                    <p class='kpi-value' style='color:{text_color};'>{diff:+,}</p>
+                    <div class='kpi-delta-tag' style='background:{bg_color}; color:{text_color};'>{growth:+,}% Change</div>
+                </div>
+            """, unsafe_allow_html=True)
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # --- กราฟเปรียบเทียบ (สีเข้ม คอนทราสต์สูง) ---
+        # --- กราฟที่ 1: แท่งคู่ชัดเจนพิเศษ ---
         st.subheader("📊 เปรียบเทียบรายแผนก (Total Days)")
         fig_bar = px.bar(df_compare, x='Ward', y=['Total_Days_M1', 'Total_Days_M2'],
                          barmode='group', text_auto=',.0f',
-                         color_discrete_sequence=['#e2e8f0', '#0f172a'])
+                         color_discrete_sequence=['#cbd5e1', '#0f172a'],
+                         labels={'value': 'Days', 'variable': 'Month'})
         fig_bar.update_layout(
-            font=dict(size=18, family="Sarabun", color="#000"),
+            font=dict(size=18, family="Sarabun", color="#000000"),
             plot_bgcolor='rgba(0,0,0,0)', 
-            xaxis=dict(tickfont=dict(size=18, color="#000", weight='bold')),
-            margin=dict(t=50)
+            xaxis=dict(tickfont=dict(size=20, color="#000", weight='bold')),
+            yaxis=dict(tickfont=dict(size=16, color="#000")),
+            legend=dict(font=dict(size=18), orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        fig_bar.update_traces(textposition='outside', textfont_size=22, textfont_weight="bold")
+        fig_bar.update_traces(textposition='outside', textfont_size=22, textfont_weight="bold", textfont_color="#000")
         st.plotly_chart(fig_bar, use_container_width=True)
 
-        # --- กราฟ Growth % ---
-        st.subheader("📈 อัตราการเปลี่ยนแปลง (%)")
-        df_compare['Status'] = df_compare['% Growth'].apply(lambda x: 'Positive' if x >= 0 else 'Negative')
+        # --- กราฟที่ 2: Growth % ใหญ่ชัดเจน ---
+        st.subheader("📈 อัตราการเปลี่ยนแปลงรายแผนก (%)")
+        df_compare['Status'] = df_compare['% Growth'].apply(lambda x: 'Up' if x >= 0 else 'Down')
         fig_growth = px.bar(df_compare, x='Ward', y='% Growth', color='Status',
-                            text_auto='d', color_discrete_map={'Positive': '#10b981', 'Negative': '#ef4444'})
+                            text_auto='d', color_discrete_map={'Up': '#10b981', 'Down': '#ef4444'})
         fig_growth.update_layout(
-            font=dict(size=18, family="Sarabun", color="#000"),
-            plot_bgcolor='rgba(0,0,0,0)', showlegend=False
+            font=dict(size=18, family="Sarabun", color="#000000"),
+            plot_bgcolor='rgba(0,0,0,0)', showlegend=False,
+            xaxis=dict(tickfont=dict(size=20, color="#000", weight='bold'))
         )
-        fig_growth.update_traces(textposition='outside', textfont_size=22, textfont_weight="bold")
+        fig_growth.update_traces(textposition='outside', textfont_size=22, textfont_weight="bold", textfont_color="#000")
         st.plotly_chart(fig_growth, use_container_width=True)
+
+        # ตารางสรุป (Font ใหญ่และสีชัด)
+        st.markdown("---")
+        st.subheader("📋 ตารางสรุปข้อมูลสำหรับผู้บริหาร")
+        styled_df = df_compare[['Ward', 'Total_Days_M1', 'Total_Days_M2', 'Diff', '% Growth']].style.format(precision=0).applymap(color_growth, subset=['% Growth'])
+        st.dataframe(styled_df, use_container_width=True)
+        
+        buf_comp = io.BytesIO()
+        df_compare.drop(columns=['Status']).to_excel(buf_comp, index=False)
+        st.download_button("📥 ดาวน์โหลดรายงานสรุปเป็น Excel", data=buf_comp.getvalue(), file_name="Executive_Summary.xlsx")
 
     elif page == "📄 Data Editor":
         excel_2 = pd.ExcelFile(file_2)
-        selected_sheet = st.sidebar.selectbox("เลือกวอร์ด:", excel_2.sheet_names)
-        st.markdown(f"<h1 class='main-title'>Editor: {selected_sheet}</h1>", unsafe_allow_html=True)
+        selected_sheet = st.sidebar.selectbox("เลือกวอร์ดที่ต้องการแก้ไข:", excel_2.sheet_names)
+        st.markdown(f"<h2 style='color:#0f172a;'>📝 แก้ไขข้อมูลวอร์ด: {selected_sheet}</h2>", unsafe_allow_html=True)
         
         df_raw = pd.read_excel(file_2, sheet_name=selected_sheet).dropna(how='all')
         edited_df = st.data_editor(df_raw, use_container_width=True, hide_index=True)
         
         total_val, device_cols = get_safe_total(edited_df)
         if device_cols:
-            st.markdown("### 🧮 Live สรุปยอด")
+            st.markdown("### 🧮 ยอดคำนวณแบบ Real-time")
             summary_row = edited_df[device_cols].apply(pd.to_numeric, errors='coerce').fillna(0).sum().astype(int)
             m_cols = st.columns(len(device_cols) + 1)
             for i, col in enumerate(device_cols):
                 m_cols[i].metric(col, f"{summary_row[col]:,}")
             m_cols[-1].metric("GRAND TOTAL", f"{total_val:,}")
             
-            # Export
+            # Export ทั้งไฟล์
             st.markdown("---")
-            if st.button("📥 ดาวน์โหลดรายงานโรงพยาบาล (ทุก Sheet)"):
-                bulk_buf = io.BytesIO()
-                with pd.ExcelWriter(bulk_buf, engine='xlsxwriter') as writer:
-                    for s in excel_2.sheet_names:
-                        s_df = pd.read_excel(file_2, sheet_name=s).dropna(how='all')
-                        _, s_cols = get_safe_total(s_df)
-                        if s_cols:
-                            for c in s_cols: s_df[c] = pd.to_numeric(s_df[c], errors='coerce').fillna(0).astype(int)
-                            s_sum = s_df[s_cols].sum().to_frame().T
-                            s_sum.index = [len(s_df)]; s_df = pd.concat([s_df, s_sum])
-                            s_df.iloc[-1, 0] = "GRAND TOTAL"
-                        s_df.to_excel(writer, sheet_name=s, index=False)
-                st.download_button("📥 คลิกเพื่อดาวน์โหลด", data=bulk_buf.getvalue(), file_name="Hospital_Report.xlsx")
-
-else:
-    st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 EXECUTIVE DASHBOARD</h1><p>กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มวิเคราะห์</p></div>", unsafe_allow_html=True)
+            if st.button("📥 รวบรวมและดาวน์โหลดทุกวอร์ดเป็นไฟล์เดียว"):
+                with st.spinner('กำลังประมวลผลข้อมูล...'):
+                    bulk_buf = io.BytesIO()
+                    with pd.ExcelWriter(bulk_buf, engine='xlsxwriter') as writer:
+                        for s in excel_2.sheet_names:
+                            s_df = pd.read_excel(file_2, sheet_name=s).dropna(how='all')
+                            _, s_cols = get_safe_total(s_df)
+                            if s_cols:
+                                for c in s_cols: s_df[c] = pd.to_numeric(s_df[c], errors='coerce').fillna(0).astype(int)
+                                s_sum = s_df[s_cols].sum().to_frame().T
+                                s_sum.index = [len(s_df)]; s_df = pd.concat([s_df, s_sum])
+                                s_df.iloc[-1, 0] = "GRAND TOTAL"
+                            s_df.to_excel(writer, sheet_name=s, index=False)
+                    st.download_button("📥 คลิกที่นี่เพื่อดาวน์โหลดไฟล์สมบูรณ์", data=bulk_buf.getvalue(), file_name="Full_Hospital
