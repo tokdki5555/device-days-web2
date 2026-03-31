@@ -88,7 +88,7 @@ file_2 = st.sidebar.file_uploader("📂 เดือนที่ 2 (Current Mont
 
 if file_1 and file_2:
     st.sidebar.markdown("---")
-    page = st.sidebar.selectbox("🎯 เลือกดูข้อมูล", ["📊 Executive Dashboard", "📄 Data Editor"])
+    page = st.sidebar.selectbox("🎯 เลือกดูข้อมูล", ["📊 Utilization Analytics", "📄 Data Editor"])
 
     df_stats_1 = process_file_summary(file_1)
     df_stats_2 = process_file_summary(file_2)
@@ -97,7 +97,7 @@ if file_1 and file_2:
     df_compare['Diff'] = (df_compare['Total_Days_M2'] - df_compare['Total_Days_M1']).astype(int)
     df_compare['% Growth'] = ((df_compare['Diff'] / df_compare['Total_Days_M1']) * 100).replace([float('inf'), -float('inf')], 0).fillna(0).round(0).astype(int)
 
-    if page == "📊 Executive Dashboard":
+    if page == "📊 Utilization Analytics":
         st.markdown("<h1 class='main-title'>Utilization Analytics</h1>", unsafe_allow_html=True)
 
         t1, t2 = int(df_compare['Total_Days_M1'].sum()), int(df_compare['Total_Days_M2'].sum())
@@ -105,7 +105,7 @@ if file_1 and file_2:
         bg_color = "#d1fae5" if diff >= 0 else "#fee2e2"
         text_color = "#047857" if diff >= 0 else "#b91c1c"
 
-        # --- KPI SECTION (ตัวเลขใหญ่สะใจ) ---
+        # --- KPI SECTION ---
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown(f"<div class='kpi-container'><p class='kpi-label'>Previous Month</p><p class='kpi-value'>{t1:,}</p></div>", unsafe_allow_html=True)
@@ -120,8 +120,8 @@ if file_1 and file_2:
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # --- กราฟแท่ง (ฟอนต์ใหญ่ คอนทราสต์สูง) ---
-        st.subheader("📊 เปรียบเทียบรายแผนก (ตัวเลขจำนวนเต็ม)")
+        # --- กราฟแท่งเปรียบเทียบ (M1 vs M2) ---
+        st.subheader("📊 เปรียบเทียบจำนวนวันการใช้งานรายแผนก")
         fig_bar = px.bar(df_compare, x='Ward', y=['Total_Days_M1', 'Total_Days_M2'],
                          barmode='group', text_auto=',.0f',
                          color_discrete_sequence=['#cbd5e1', '#0f172a'])
@@ -134,11 +134,29 @@ if file_1 and file_2:
         fig_bar.update_traces(textposition='outside', textfont_size=22, textfont_weight="bold", textfont_color="#000")
         st.plotly_chart(fig_bar, use_container_width=True)
 
-        # ตารางข้อมูล (Font ชัดเจน)
+        # --- กราฟอัตราการเติบโต (Growth %) ---
+        st.subheader("📈 อัตราการเปลี่ยนแปลงรายแผนก (%)")
+        df_compare['Status'] = df_compare['% Growth'].apply(lambda x: 'Up' if x >= 0 else 'Down')
+        fig_growth = px.bar(df_compare, x='Ward', y='% Growth', color='Status',
+                            text_auto='d', color_discrete_map={'Up': '#10b981', 'Down': '#ef4444'})
+        fig_growth.update_layout(
+            font=dict(size=18, family="Sarabun", color="#000"),
+            plot_bgcolor='rgba(0,0,0,0)', showlegend=False,
+            xaxis=dict(tickfont=dict(size=20, color="#000", weight='bold'))
+        )
+        fig_growth.update_traces(textposition='outside', textfont_size=22, textfont_weight="bold", textfont_color="#000")
+        st.plotly_chart(fig_growth, use_container_width=True)
+
+        # --- ตารางข้อมูลและปุ่ม Export (หน้า Dashboard) ---
         st.markdown("---")
-        st.subheader("📋 รายละเอียดข้อมูลผู้บริหาร")
+        st.subheader("📋 รายละเอียดข้อมูลเปรียบเทียบ")
         styled_df = df_compare[['Ward', 'Total_Days_M1', 'Total_Days_M2', 'Diff', '% Growth']].style.format(precision=0).applymap(color_growth, subset=['% Growth'])
         st.dataframe(styled_df, use_container_width=True)
+        
+        # ปุ่ม Export รายงาน Comparison
+        buf_comp = io.BytesIO()
+        df_compare.drop(columns=['Status']).to_excel(buf_comp, index=False)
+        st.download_button("📥 ดาวน์โหลดรายงานเปรียบเทียบ (Excel)", data=buf_comp.getvalue(), file_name="Utilization_Comparison.xlsx")
 
     elif page == "📄 Data Editor":
         excel_2 = pd.ExcelFile(file_2)
@@ -157,7 +175,7 @@ if file_1 and file_2:
                 m_cols[i].metric(col, f"{summary_row[col]:,}")
             m_cols[-1].metric("GRAND TOTAL", f"{total_val:,}")
             
-            # --- แก้ไขส่วน Bulk Export (รวบรวมทุกวอร์ด) ---
+            # --- Bulk Export (รวบรวมทุกวอร์ด) ---
             st.markdown("---")
             if st.button("📥 รวบรวมข้อมูลทุกวอร์ด (Bulk Export)"):
                 try:
@@ -172,9 +190,9 @@ if file_1 and file_2:
                                 s_sum.index = [len(s_df)]; s_df = pd.concat([s_df, s_sum])
                                 s_df.iloc[-1, 0] = "GRAND TOTAL"
                             s_df.to_excel(writer, sheet_name=s, index=False)
-                    st.download_button("📥 คลิกเพื่อดาวน์โหลดรายงานโรงพยาบาล", data=bulk_buf.getvalue(), file_name="Hospital_Device_Report.xlsx")
+                    st.download_button("📥 คลิกเพื่อดาวน์โหลดรายงานโรงพยาบาล", data=bulk_buf.getvalue(), file_name="Full_Device_Report.xlsx")
                 except Exception as e:
-                    st.error(f"Error: กรุณาตรวจสอบว่ามี 'xlsxwriter' ในไฟล์ requirements.txt หรือไม่? ({e})")
+                    st.error(f"Error: กรุณาตรวจสอบไฟล์ requirements.txt ว่ามี 'xlsxwriter' หรือไม่? ({e})")
 
 else:
     st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 EXECUTIVE HUB</h1><p>กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มวิเคราะห์</p></div>", unsafe_allow_html=True)
