@@ -10,6 +10,7 @@ st.set_page_config(page_title="Executive Device Analytics", page_icon="🏥", la
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap');
+
     
     /* บังคับตัวหนังสือดำเข้มและชัดเจนที่สุด */
     html, body, [class*="css"] { 
@@ -195,4 +196,4 @@ if file_1 and file_2:
                     st.error(f"Error: กรุณาตรวจสอบไฟล์ requirements.txt ว่ามี 'xlsxwriter' หรือไม่? ({e})")
 
 else:
-    st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 EXECUTIVE HUB</h1><p>กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มวิเคราะห์</p></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 EXECUTIVE SYSTEM</h1><p>กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มวิเคราะห์</p></div>", unsafe_allow_html=True)
