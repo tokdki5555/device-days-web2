@@ -2,99 +2,109 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# ตั้งค่าหน้ากระดาษ
-st.set_page_config(page_title="Performance Analysis", layout="wide")
+# ตั้งค่าหน้ากระดาษให้ดูทันสมัย
+st.set_page_config(page_title="Performance Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-def process_data(file):
-    """ฟังก์ชันสำหรับอ่านไฟล์ Excel"""
-    try:
-        df = pd.read_excel(file)
-        return df
-    except Exception as e:
-        st.error(f"Error reading file: {e}")
-        return None
+# ปรับแต่ง CSS เพื่อความสวยงาม
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+    """, unsafe_allow_html=True)
 
 def main():
-    st.title("📊 Comparative Performance Analysis")
-    st.markdown("---")
-
-    # ส่วนการ Upload ไฟล์
-    col_up1, col_up2 = st.columns(2)
-    with col_up1:
-        file1 = st.file_uploader("Upload File 1 (Base Period)", type=['xlsx'])
-    with col_up2:
-        file2 = st.file_uploader("Upload File 2 (Comparison Period)", type=['xlsx'])
+    st.title("🚀 Professional Performance Analysis")
+    
+    with st.sidebar:
+        st.header("📂 Data Source")
+        file1 = st.file_uploader("Upload Base Period (Excel)", type=['xlsx'])
+        file2 = st.file_uploader("Upload Comparison Period (Excel)", type=['xlsx'])
+        st.divider()
+        st.info("คำแนะนำ: ตรวจสอบให้มั่นใจว่าทั้ง 2 ไฟล์มีโครงสร้างคอลัมน์ที่เหมือนกัน")
 
     if file1 and file2:
-        df1 = process_data(file1)
-        df2 = process_data(file2)
+        df1 = pd.read_excel(file1)
+        df2 = pd.read_excel(file2)
 
-        if df1 is not None and df2 is not None:
-            # --- 1. ส่วนสรุปยอดรวม (Summary Metrics) ---
-            # สมมติว่ามีคอลัมน์ชื่อ 'Value' สำหรับคำนวณ
-            total1 = df1['Value'].sum()
-            total2 = df2['Value'].sum()
+        # แก้ปัญหา KeyError โดยการให้ผู้ใช้เลือกคอลัมน์เอง
+        st.subheader("⚙️ Settings")
+        col_set1, col_set2 = st.columns(2)
+        
+        all_columns = df1.columns.tolist()
+        
+        with col_set1:
+            cat_col = st.selectbox("เลือกคอลัมน์ 'หมวดหมู่' (เช่น Category, Product):", all_columns)
+        with col_set2:
+            val_col = st.selectbox("เลือกคอลัมน์ 'ตัวเลข' (เช่น Value, Sales, Amount):", all_columns)
+
+        st.divider()
+
+        try:
+            # คำนวณสรุปยอด
+            total1 = df1[val_col].sum()
+            total2 = df2[val_col].sum()
             diff_val = total2 - total1
             diff_pct = (diff_val / total1) * 100 if total1 != 0 else 0
 
-            st.subheader("📌 Key Performance Summary")
+            # --- 1. สรุปยอดรวมแบบสวยงาม (KPI Cards) ---
             m1, m2, m3 = st.columns(3)
-            m1.metric("ยอดรวมไฟล์ที่ 1", f"{total1:,.2f}")
-            m2.metric("ยอดรวมไฟล์ที่ 2", f"{total2:,.2f}")
-            m3.metric("การเปลี่ยนแปลง (%)", f"{diff_pct:+.2f}%", delta=f"{diff_val:,.2f}")
+            m1.metric(f"Total {val_col} (File 1)", f"{total1:,.2f}")
+            m2.metric(f"Total {val_col} (File 2)", f"{total2:,.2f}")
+            m3.metric("Growth Rate", f"{diff_pct:+.2f}%", delta=f"{diff_val:,.2f}")
 
-            st.divider()
-
-            # --- 2. ส่วนกราฟเปรียบเทียบ (Visualizations) ---
-            st.subheader("📈 Comparative Graphs")
+            # --- 2. กราฟเปรียบเทียบ ---
+            st.subheader("📊 Comparative Visualization")
             
-            # เตรียมข้อมูลสำหรับกราฟ
-            df1['Source'] = 'File 1'
-            df2['Source'] = 'File 2'
-            combined_df = pd.concat([df1, df2])
+            # รวมข้อมูลเพื่อพล็อตกราฟ
+            df1_temp = df1[[cat_col, val_col]].copy()
+            df1_temp['Period'] = 'File 1'
+            df2_temp = df2[[cat_col, val_col]].copy()
+            df2_temp['Period'] = 'File 2'
+            combined_df = pd.concat([df1_temp, df2_temp])
 
-            c1, c2 = st.columns(2)
+            c1, c2 = st.columns([2, 1])
             
             with c1:
-                # กราฟแท่งเปรียบเทียบตาม Category
                 fig_bar = px.bar(
-                    combined_df, 
-                    x='Category', 
-                    y='Value', 
-                    color='Source', 
-                    barmode='group',
-                    title="ยอดขาย/ผลงาน แยกตามหมวดหมู่"
+                    combined_df, x=cat_col, y=val_col, color='Period',
+                    barmode='group', text_auto='.2s',
+                    template="plotly_white",
+                    color_discrete_sequence=['#636EFA', '#EF553B']
                 )
+                fig_bar.update_layout(title_font_size=20)
                 st.plotly_chart(fig_bar, use_container_width=True)
 
             with c2:
-                # กราฟเส้นแสดงแนวโน้ม (ถ้ามีคอลัมน์วันที่ หรือ ลำดับ)
-                fig_pie = px.pie(
-                    combined_df, 
-                    values='Value', 
-                    names='Source', 
-                    hole=0.4,
-                    title="สัดส่วนยอดรวมทั้งหมด"
-                )
-                st.plotly_chart(fig_pie, use_container_width=True)
+                # กราฟ Donut สัดส่วนยอดรวม
+                pie_data = pd.DataFrame({
+                    'Period': ['File 1', 'File 2'],
+                    'Total': [total1, total2]
+                })
+                fig_donut = px.pie(pie_data, values='Total', names='Period', hole=0.5,
+                                  color_discrete_sequence=['#636EFA', '#EF553B'])
+                st.plotly_chart(fig_donut, use_container_width=True)
 
-            # --- 3. ส่วนตารางวิเคราะห์เชิงลึก (Analysis Table) ---
-            st.subheader("📋 Deep Dive Analysis")
-            
-            # สร้าง Pivot Table เพื่อดู % Change รายหมวดหมู่
-            pivot_df = combined_df.pivot_table(index='Category', columns='Source', values='Value', aggfunc='sum')
-            pivot_df['Difference'] = pivot_df['File 2'] - pivot_df['File 1']
-            pivot_df['% Growth'] = (pivot_df['Difference'] / pivot_df['File 1']) * 100
-            
-            # แสดงตารางพร้อมใส่สี Highlight
+            # --- 3. ตารางวิเคราะห์เชิงลึก ---
+            st.subheader("🔍 Deep Dive Table")
+            summary = combined_df.groupby([cat_col, 'Period'])[val_col].sum().unstack().reset_index()
+            summary['Diff'] = summary['File 2'] - summary['File 1']
+            summary['% Change'] = (summary['Diff'] / summary['File 1']) * 100
+
             st.dataframe(
-                pivot_df.style.format("{:,.2f}")
-                .highlight_max(subset=['File 1', 'File 2'], color='#d1f2eb')
-                .bar(subset=['% Growth'], color='#fb8500', align='mid')
+                summary.style.format({
+                    'File 1': '{:,.2f}', 'File 2': '{:,.2f}',
+                    'Diff': '{:,.2f}', '% Change': '{:+.2f}%'
+                }).background_gradient(subset=['% Change'], cmap='RdYlGn'),
+                use_container_width=True
             )
 
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการประมวลผลข้อมูล: {e}")
     else:
-        st.info("กรุณา Upload ไฟล์ Excel ทั้ง 2 ไฟล์เพื่อเริ่มการวิเคราะห์")
+        # หน้า Welcome เมื่อยังไม่ได้อัปโหลดไฟล์
+        st.info("👋 ยินดีต้อนรับ! กรุณาอัปโหลดไฟล์ Excel ทั้ง 2 ไฟล์ที่แถบด้านซ้ายเพื่อเริ่มการวิเคราะห์")
+        st.image("https://img.freepik.com/free-vector/data-report-concept-illustration_114360-883.jpg", width=400)
 
 if __name__ == "__main__":
     main()
