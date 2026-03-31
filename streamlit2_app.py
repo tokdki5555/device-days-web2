@@ -2,35 +2,37 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# --- 1. Settings & Style ---
+# --- 1. SETTINGS ---
 st.set_page_config(page_title="Medical Device Days Dashboard", layout="wide")
-st.markdown("""
-    <style>
-    .main { background-color: #f8fafc; }
-    .stMetric { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 5px solid #2563eb; }
-    </style>
-    """, unsafe_allow_html=True)
 
-def clean_and_sum(df):
-    """ฟังก์ชันทำความสะอาดข้อมูลและหายอดรวมที่ถูกต้อง"""
-    # 1. ลบบรรทัดที่ว่างทั้งหมดออก
+def get_accurate_sum(df):
+    """ฟังก์ชันดึงค่าตัวเลขที่ถูกต้องรายบรรทัด (ป้องกันการบวกเลข Total ซ้ำ)"""
+    # ลบบรรทัดว่าง
     df = df.dropna(how='all').reset_index(drop=True)
     
-    # 2. ค้นหาคอลัมน์ตัวเลข (คอลัมน์ที่มีคำว่า 'Total' หรือคอลัมน์ที่ 2 เป็นต้นไป)
-    # เราจะแปลงทุกคอลัมน์เป็นตัวเลข ถ้าแปลงไม่ได้ให้เป็น NaN
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
+    # โดยปกติ: Column 0 คือชื่ออุปกรณ์, Column 1 คือตัวเลข
+    # เราจะกรองเอาเฉพาะบรรทัดที่มีชื่ออุปกรณ์และมีตัวเลขจริงๆ
+    # และตัดบรรทัดที่มีคำว่า 'Total', 'รวม', 'Sum' ออกเพื่อไม่ให้เลขเบิ้ล
     
-    # 3. เลือกคอลัมน์ที่มีตัวเลขมากที่สุด (มักจะเป็นคอลัมน์ Total Device Days)
-    numeric_df = df.select_dtypes(include=['number'])
-    if not numeric_df.empty:
-        # หายอดรวมของคอลัมน์ที่มีค่ารวมสูงสุด (เพื่อกันไปหยิบเอาคอลัมน์ลำดับที่มา)
-        sums = numeric_df.sum()
-        return sums.max(), df # คืนค่าผลรวมสูงสุด
-    return 0, df
+    temp_df = df.copy()
+    col_name = temp_df.columns[0]
+    col_val = temp_df.columns[1]
+    
+    # แปลงคอลัมน์ตัวเลขให้เป็น numeric (ค่าไหนไม่ใช่เลขจะเป็น NaN)
+    temp_df[col_val] = pd.to_numeric(temp_df[col_val], errors='coerce')
+    
+    # กรองเอาเฉพาะบรรทัดที่:
+    # 1. คอลัมน์แรกไม่ใช่คำว่า Total/รวม
+    # 2. คอลัมน์สองเป็นตัวเลขและมากกว่า 0
+    mask = (
+        temp_df[col_name].astype(str).str.contains('Total|รวม|Sum|Grand', case=False, na=False) == False
+    ) & (temp_df[col_val] > 0)
+    
+    final_df = temp_df[mask]
+    return final_df[col_val].sum(), final_df
 
 def main():
-    st.title("🏥 Executive Device Days Dashboard")
+    st.title("🏥 Executive Device Days Dashboard (Corrected)")
     st.divider()
 
     with st.sidebar:
@@ -48,13 +50,12 @@ def main():
             g_total1, g_total2 = 0, 0
 
             for sheet in all_sheets:
-                # อ่านไฟล์โดยเริ่มเช็คตั้งแต่บรรทัดแรก
                 d1_raw = pd.read_excel(f1, sheet_name=sheet)
                 d2_raw = pd.read_excel(f2, sheet_name=sheet)
 
-                # คำนวณยอดรวมที่ถูกต้อง
-                val1, _ = clean_and_sum(d1_raw)
-                val2, _ = clean_and_sum(d2_raw)
+                # คำนวณยอดแบบแม่นยำรายบรรทัด
+                val1, _ = get_accurate_sum(d1_raw)
+                val2, _ = get_accurate_sum(d2_raw)
 
                 g_total1 += val1
                 g_total2 += val2
@@ -63,36 +64,36 @@ def main():
 
             df_summary = pd.DataFrame(summary_data)
 
-            # --- ส่วนแสดงผล KPI ---
-            st.subheader("💰 สรุปภาพรวม")
+            # --- KPI Cards ---
+            st.subheader("💰 สรุปยอดรวม (ตรวจสอบความถูกต้อง)")
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("ยอดรวม M1", f"{g_total1:,.0f}")
             m2.metric("ยอดรวม M2", f"{g_total2:,.0f}")
-            diff = g_total2 - g_total1
-            m3.metric("ผลต่าง", f"{diff:+,.0f}")
-            m4.metric("Growth (%)", f"{(diff/g_total1*100 if g_total1 != 0 else 0):+.2f}%")
+            m3.metric("ผลต่าง", f"{g_total2 - g_total1:+,.0f}")
+            m4.metric("Growth (%)", f"{((g_total2-g_total1)/g_total1*100 if g_total1 != 0 else 0):+.2f}%")
 
             # --- กราฟเปรียบเทียบรายแผนก ---
             st.divider()
-            st.subheader("📊 เปรียบเทียบรายแผนก")
             fig = px.bar(df_summary, x='แผนก', y=['M1', 'M2'], barmode='group',
+                         title="เปรียบเทียบ Device Days รายแผนก (ยอดสุทธิ)",
                          color_discrete_sequence=['#94a3b8', '#2563eb'], template="plotly_white")
             st.plotly_chart(fig, use_container_width=True)
 
-            # --- เจาะลึกรายรายการ ---
+            # --- ตารางตรวจสอบความถูกต้องรายแผนก ---
             st.divider()
-            st.subheader("🔍 รายละเอียดรายการในแผนก")
-            selected_dept = st.selectbox("เลือกแผนก:", all_sheets)
+            st.subheader("🔍 ตารางตรวจสอบรายรายการ (ป้องกันเลขเบิ้ล)")
+            selected_dept = st.selectbox("เลือกแผนกเพื่อดูรายการที่นำมาคำนวณ:", all_sheets)
             
-            # ดึงข้อมูลมาแสดงเป็นตาราง (ใช้ฟังก์ชันเดิมที่เคยแก้เรื่อง Error ไว้)
-            temp1 = pd.read_excel(f1, sheet_name=selected_dept)
-            temp2 = pd.read_excel(f2, sheet_name=selected_dept)
-            
-            # แสดงตารางเปรียบเทียบแบบง่าย
-            st.write(f"ข้อมูลดิบจากแผนก: {selected_dept}")
+            _, d1_detailed = get_accurate_sum(pd.read_excel(f1, sheet_name=selected_dept))
+            _, d2_detailed = get_accurate_sum(pd.read_excel(f2, sheet_name=selected_dept))
+
             col_a, col_b = st.columns(2)
-            with col_a: st.write("เดือนที่ 1"); st.dataframe(temp1.dropna(how='all').iloc[:10, :2])
-            with col_b: st.write("เดือนที่ 2"); st.dataframe(temp2.dropna(how='all').iloc[:10, :2])
+            with col_a:
+                st.write(f"รายการที่ระบบดึงจาก M1 ({selected_dept})")
+                st.dataframe(d1_detailed.iloc[:, :2], use_container_width=True)
+            with col_b:
+                st.write(f"รายการที่ระบบดึงจาก M2 ({selected_dept})")
+                st.dataframe(d2_detailed.iloc[:, :2], use_container_width=True)
 
         except Exception as e:
             st.error(f"❌ เกิดข้อผิดพลาด: {e}")
