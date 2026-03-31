@@ -4,7 +4,7 @@ import plotly.express as px
 import io
 from datetime import datetime
 
-# 1. Config & Ultra-Clear Executive Styling
+# 1. Config & Ultra-Modern Executive Styling
 st.set_page_config(page_title="Executive Device Analytics", page_icon="🏥", layout="wide")
 
 st.markdown("""
@@ -24,29 +24,33 @@ st.markdown("""
         text-align: center; margin-bottom: 50px;
     }
 
-    /* Mega KPI Card - ใหญ่ ชัดเจน อ่านง่ายจากระยะไกล */
+    /* MEGA KPI Card - ออกแบบมาเพื่อความชัดเจนสูงสุด */
     .kpi-container {
         background: #f8fafc;
-        padding: 3.5rem 2rem;
+        padding: 4rem 1rem;
         border-radius: 35px;
         text-align: center;
         box-shadow: 0 10px 25px rgba(0,0,0,0.05);
         border: 2px solid #e2e8f0;
+        min-height: 350px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     
     .kpi-label { 
-        color: #475569; font-size: 1.5rem; font-weight: 700; 
-        text-transform: uppercase; margin-bottom: 10px;
+        color: #475569; font-size: 1.8rem; font-weight: 700; 
+        text-transform: uppercase; margin-bottom: 15px;
     }
     
     .kpi-value { 
-        color: #000000; font-size: 5.8rem; font-weight: 800; 
-        margin: 0; line-height: 1;
+        color: #000000; font-size: 6.5rem; font-weight: 800; 
+        margin: 0; line-height: 1; letter-spacing: -2px;
     }
     
     .kpi-delta-tag { 
-        margin-top: 1.5rem; padding: 10px 25px; border-radius: 100px; 
-        display: inline-block; font-weight: 800; font-size: 2rem; 
+        margin-top: 2rem; padding: 12px 30px; border-radius: 100px; 
+        display: inline-block; font-weight: 800; font-size: 2.2rem; 
     }
 
     /* ปุ่มกดตัวหนาชัดเจน */
@@ -88,7 +92,7 @@ file_2 = st.sidebar.file_uploader("📂 เดือนที่ 2 (Current Mont
 
 if file_1 and file_2:
     st.sidebar.markdown("---")
-    page = st.sidebar.selectbox("🎯 เลือกดูข้อมูล", ["📊 Utilization Analytics", "📄 Data Editor"])
+    page = st.sidebar.selectbox("🎯 เมนูหลัก", ["📊 Utilization Analytics", "📄 Data Editor"])
 
     df_stats_1 = process_file_summary(file_1)
     df_stats_2 = process_file_summary(file_2)
@@ -105,7 +109,7 @@ if file_1 and file_2:
         bg_color = "#d1fae5" if diff >= 0 else "#fee2e2"
         text_color = "#047857" if diff >= 0 else "#b91c1c"
 
-        # --- KPI SECTION ---
+        # --- MEGA KPI SECTION ---
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown(f"<div class='kpi-container'><p class='kpi-label'>Previous Month</p><p class='kpi-value'>{t1:,}</p></div>", unsafe_allow_html=True)
@@ -118,10 +122,22 @@ if file_1 and file_2:
                 <div class='kpi-delta-tag' style='background:{bg_color}; color:{text_color};'>{growth:+,}% Change</div>
             </div>""", unsafe_allow_html=True)
 
+        # --- ส่วน Export เฉพาะยอด KPI ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        kpi_data = {
+            'Metric': ['Previous Month Total', 'Current Month Total', 'Variance', 'Growth %'],
+            'Value': [f"{t1:,}", f"{t2:,}", f"{diff:+,}", f"{growth:+,}%"]
+        }
+        df_kpi_export = pd.DataFrame(kpi_data)
+        
+        buf_kpi = io.BytesIO()
+        df_kpi_export.to_excel(buf_kpi, index=False)
+        st.download_button("📥 Export KPI Summary (เฉพาะยอดรวม)", data=buf_kpi.getvalue(), file_name="KPI_Summary.xlsx")
+
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # --- กราฟแท่งเปรียบเทียบ (M1 vs M2) ---
-        st.subheader("📊 เปรียบเทียบจำนวนวันการใช้งานรายแผนก")
+        # --- กราฟเปรียบเทียบรายแผนก ---
+        st.subheader("📊 เปรียบเทียบรายแผนก (M1 vs M2)")
         fig_bar = px.bar(df_compare, x='Ward', y=['Total_Days_M1', 'Total_Days_M2'],
                          barmode='group', text_auto=',.0f',
                          color_discrete_sequence=['#cbd5e1', '#0f172a'])
@@ -134,8 +150,8 @@ if file_1 and file_2:
         fig_bar.update_traces(textposition='outside', textfont_size=22, textfont_weight="bold", textfont_color="#000")
         st.plotly_chart(fig_bar, use_container_width=True)
 
-        # --- กราฟอัตราการเติบโต (Growth %) ---
-        st.subheader("📈 อัตราการเปลี่ยนแปลงรายแผนก (%)")
+        # --- กราฟ Growth % ---
+        st.subheader("📈 อัตราการเปลี่ยนแปลง (%)")
         df_compare['Status'] = df_compare['% Growth'].apply(lambda x: 'Up' if x >= 0 else 'Down')
         fig_growth = px.bar(df_compare, x='Ward', y='% Growth', color='Status',
                             text_auto='d', color_discrete_map={'Up': '#10b981', 'Down': '#ef4444'})
@@ -147,16 +163,15 @@ if file_1 and file_2:
         fig_growth.update_traces(textposition='outside', textfont_size=22, textfont_weight="bold", textfont_color="#000")
         st.plotly_chart(fig_growth, use_container_width=True)
 
-        # --- ตารางข้อมูลและปุ่ม Export (หน้า Dashboard) ---
+        # --- ตารางข้อมูลและ Export ตัวเต็ม ---
         st.markdown("---")
-        st.subheader("📋 รายละเอียดข้อมูลเปรียบเทียบ")
+        st.subheader("📋 ตารางข้อมูลเปรียบเทียบ")
         styled_df = df_compare[['Ward', 'Total_Days_M1', 'Total_Days_M2', 'Diff', '% Growth']].style.format(precision=0).applymap(color_growth, subset=['% Growth'])
         st.dataframe(styled_df, use_container_width=True)
         
-        # ปุ่ม Export รายงาน Comparison
         buf_comp = io.BytesIO()
         df_compare.drop(columns=['Status']).to_excel(buf_comp, index=False)
-        st.download_button("📥 ดาวน์โหลดรายงานเปรียบเทียบ (Excel)", data=buf_comp.getvalue(), file_name="Utilization_Comparison.xlsx")
+        st.download_button("📥 Export Detailed Report (ข้อมูลวอร์ดทั้งหมด)", data=buf_comp.getvalue(), file_name="Full_Comparison_Report.xlsx")
 
     elif page == "📄 Data Editor":
         excel_2 = pd.ExcelFile(file_2)
@@ -190,9 +205,9 @@ if file_1 and file_2:
                                 s_sum.index = [len(s_df)]; s_df = pd.concat([s_df, s_sum])
                                 s_df.iloc[-1, 0] = "GRAND TOTAL"
                             s_df.to_excel(writer, sheet_name=s, index=False)
-                    st.download_button("📥 คลิกเพื่อดาวน์โหลดรายงานโรงพยาบาล", data=bulk_buf.getvalue(), file_name="Full_Device_Report.xlsx")
+                    st.download_button("📥 คลิกเพื่อดาวน์โหลดรายงานสมบูรณ์", data=bulk_buf.getvalue(), file_name="Hospital_Report.xlsx")
                 except Exception as e:
-                    st.error(f"Error: กรุณาตรวจสอบไฟล์ requirements.txt ว่ามี 'xlsxwriter' หรือไม่? ({e})")
+                    st.error(f"Error: {e}")
 
 else:
     st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 EXECUTIVE HUB</h1><p>กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มวิเคราะห์</p></div>", unsafe_allow_html=True)
