@@ -4,7 +4,7 @@ import plotly.express as px
 import io
 from datetime import datetime
 
-# 1. Config & Ultra-Modern Executive Styling
+# 1. Config & Ultra-Clear Executive Styling
 st.set_page_config(page_title="Executive Device Analytics", page_icon="🏥", layout="wide")
 
 st.markdown("""
@@ -19,12 +19,13 @@ st.markdown("""
     
     .stApp { background-color: #ffffff; }
     
+    /* หัวข้อหลักตัวใหญ่และหนาพิเศษ */
     .main-title { 
         color: #0f172a; font-size: 3.5rem; font-weight: 800; 
         text-align: center; margin-bottom: 50px;
     }
 
-    /* MEGA KPI Card - ตัวเลขใหญ่ยักษ์ ชัดเจนที่สุด */
+    /* MEGA KPI Card - ใหญ่ยักษ์ ชัดเจนที่สุด */
     .mega-kpi-container {
         background: #f8fafc;
         padding: 4.5rem 1rem;
@@ -90,13 +91,13 @@ def color_growth(val):
     return f'color: {color}; font-weight: 800; font-size: 1.4rem;'
 
 # --- Sidebar ---
-st.sidebar.markdown("<h1 style='text-align:center;'>🏥 SYSTEM</h1>", unsafe_allow_html=True)
+st.sidebar.markdown("<h1 style='text-align:center; color:#0f172a;'>🏥 SYSTEM</h1>", unsafe_allow_html=True)
 file_1 = st.sidebar.file_uploader("📂 เดือนที่ 1 (Previous Month)", type=["xlsx"], key="f1")
 file_2 = st.sidebar.file_uploader("📂 เดือนที่ 2 (Current Month)", type=["xlsx"], key="f2")
 
 if file_1 and file_2:
     st.sidebar.markdown("---")
-    page = st.sidebar.selectbox("🎯 เมนูเลือกดูข้อมูล", ["📊 Utilization Analytics", "📄 Data Editor"])
+    page = st.sidebar.selectbox("🎯 เลือกดูข้อมูล", ["📊 Executive Comparison", "📄 Data Editor"])
 
     df_stats_1 = process_file_summary(file_1)
     df_stats_2 = process_file_summary(file_2)
@@ -105,7 +106,7 @@ if file_1 and file_2:
     df_compare['Diff'] = (df_compare['Total_Days_M2'] - df_compare['Total_Days_M1']).astype(int)
     df_compare['% Growth'] = ((df_compare['Diff'] / df_compare['Total_Days_M1']) * 100).replace([float('inf'), -float('inf')], 0).fillna(0).round(0).astype(int)
 
-    if page == "📊 Utilization Analytics":
+    if page == "📊 Executive Comparison":
         st.markdown("<h1 class='main-title'>Device Utilization Analytics</h1>", unsafe_allow_html=True)
 
         t1, t2 = int(df_compare['Total_Days_M1'].sum()), int(df_compare['Total_Days_M2'].sum())
@@ -126,36 +127,10 @@ if file_1 and file_2:
                 <div class='mega-delta-tag' style='background:{bg_color}; color:{text_color};'>{growth:+,}% Change</div>
             </div>""", unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # --- ส่วน Export รวมทั้งหมดในหน้า Dashboard ---
-        col_btnL, col_btnR = st.columns(2)
-        with col_btnL:
-            buf_comp = io.BytesIO()
-            df_compare.to_excel(buf_comp, index=False)
-            st.download_button("📥 Export Comparison Report (สรุปเปรียบเทียบ)", data=buf_comp.getvalue(), file_name="Comparison_Summary.xlsx")
-        
-        with col_btnR:
-            if st.button("📥 Export Full Hospital Report (รวบรวมทุกวอร์ด)"):
-                with st.spinner('กำลังรวบรวมข้อมูล...'):
-                    excel_2 = pd.ExcelFile(file_2)
-                    bulk_buf = io.BytesIO()
-                    with pd.ExcelWriter(bulk_buf, engine='xlsxwriter') as writer:
-                        for s in excel_2.sheet_names:
-                            s_df = pd.read_excel(file_2, sheet_name=s).dropna(how='all')
-                            _, s_cols = get_safe_total(s_df)
-                            if s_cols:
-                                for c in s_cols: s_df[c] = pd.to_numeric(s_df[c], errors='coerce').fillna(0).astype(int)
-                                s_sum = s_df[s_cols].sum().to_frame().T
-                                s_sum.index = [len(s_df)]; s_df = pd.concat([s_df, s_sum])
-                                s_df.iloc[-1, 0] = "GRAND TOTAL"
-                            s_df.to_excel(writer, sheet_name=s, index=False)
-                    st.download_button("✅ คลิกที่นี่เพื่อดาวน์โหลดรายงานสมบูรณ์", data=bulk_buf.getvalue(), file_name="Full_Hospital_Report.xlsx")
-
         st.markdown("<br><br>", unsafe_allow_html=True)
         
         # --- กราฟเปรียบเทียบรายแผนก ---
-        st.subheader("📊 เปรียบเทียบรายแผนก (M1 vs M2)")
+        st.subheader("📊 เปรียบเทียบจำนวนวันการใช้งานรายวอร์ด (M1 vs M2)")
         fig_bar = px.bar(df_compare, x='Ward', y=['Total_Days_M1', 'Total_Days_M2'],
                          barmode='group', text_auto=',.0f',
                          color_discrete_sequence=['#cbd5e1', '#0f172a'])
@@ -190,6 +165,23 @@ if file_1 and file_2:
             for i, col in enumerate(device_cols):
                 m_cols[i].metric(col, f"{summary_row[col]:,}")
             m_cols[-1].metric("TOTAL SUM", f"{total_val:,}")
+            
+            # Bulk Export Option
+            st.markdown("---")
+            if st.button("📥 เตรียมไฟล์รวมทุกวอร์ดสำหรับดาวน์โหลด"):
+                with st.spinner('กำลังประมวลผลข้อมูล...'):
+                    bulk_buf = io.BytesIO()
+                    with pd.ExcelWriter(bulk_buf, engine='xlsxwriter') as writer:
+                        for s in excel_2.sheet_names:
+                            s_df = pd.read_excel(file_2, sheet_name=s).dropna(how='all')
+                            _, s_cols = get_safe_total(s_df)
+                            if s_cols:
+                                for c in s_cols: s_df[c] = pd.to_numeric(s_df[c], errors='coerce').fillna(0).astype(int)
+                                s_sum = s_df[s_cols].sum().to_frame().T
+                                s_sum.index = [len(s_df)]; s_df = pd.concat([s_df, s_sum])
+                                s_df.iloc[-1, 0] = "GRAND TOTAL"
+                            s_df.to_excel(writer, sheet_name=s, index=False)
+                    st.download_button("📥 คลิกเพื่อดาวน์โหลดรายงานสมบูรณ์", data=bulk_buf.getvalue(), file_name="Full_Hospital_Report.xlsx")
 
 else:
     st.markdown("<div style='text-align:center; margin-top:100px;'><h1>🏦 EXECUTIVE HUB</h1><p>กรุณาอัปโหลดไฟล์ Excel เพื่อเริ่มวิเคราะห์</p></div>", unsafe_allow_html=True)
